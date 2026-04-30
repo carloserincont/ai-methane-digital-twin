@@ -1,0 +1,69 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import time
+from datetime import datetime
+
+st.set_page_config(page_title="Methane Digital Twin", layout="wide")
+
+st.title("Methane Emission Digital Twin (Demo)")
+
+# Simulated data
+def generate_data():
+    base = np.random.normal(50, 5)
+    leak = np.random.choice([0, 1], p=[0.9, 0.1])
+    if leak:
+        return base + np.random.uniform(30, 80)
+    return base
+
+# Initialize session state
+if "data" not in st.session_state:
+    st.session_state.data = []
+
+# Generate new data point
+new_value = generate_data()
+timestamp = datetime.now()
+
+st.session_state.data.append({
+    "time": timestamp,
+    "CH4": new_value
+})
+
+df = pd.DataFrame(st.session_state.data)
+
+# Detection logic
+threshold = 80
+df["leak"] = df["CH4"] > threshold
+
+# Dashboard
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("Methane Levels")
+    st.line_chart(df.set_index("time")["CH4"])
+
+with col2:
+    latest = df.iloc[-1]
+    if latest["leak"]:
+        st.error("🚨 Leak Detected!")
+    else:
+        st.success("✅ Normal Levels")
+
+# Event log
+st.subheader("Detected Events")
+events = df[df["leak"] == True]
+st.dataframe(events)
+
+# Report generator
+if st.button("Generate Verification Report"):
+    if len(events) == 0:
+        st.info("No leaks detected.")
+    else:
+        last_event = events.iloc[-1]
+        impact = last_event["CH4"] * 0.086  # simple factor
+
+        st.markdown("### 📄 Verification Report")
+        st.write(f"Time: {last_event['time']}")
+        st.write(f"CH4 Level: {last_event['CH4']:.2f}")
+        st.write("Status: Leak Detected")
+        st.write(f"Estimated Climate Impact: {impact:.2f} CO2-eq")
